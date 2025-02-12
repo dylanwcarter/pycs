@@ -1,6 +1,6 @@
 function GetStartedButton() {
   return (
-    <button className="text-gray-300 border border-gray-300 text-2xl font-[Geist] rounded-full mt-3">
+    <button className="bg-black text-white rounded-full text-2xl px-3 py-3 mt-5 border-4 border-gray-700 hover:bg-gray-700 transition">
       Get Started
     </button>
   );
