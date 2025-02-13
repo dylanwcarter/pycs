@@ -1,6 +1,8 @@
-import GetStartedButton from '../components/buttons/GetStartedButton';
 import LandingTopbar from '../components/LandingTopbar';
 import animationVideo from '../assets/animations/pycs-animation.mp4';
+import RevolutionizeImage from '../assets/images/revolutionize-crop.png';
+import TrainModelsImage from '../assets/images/train-models.png';
+import EasyPlatformImage from '../assets/images/easy-platform.png';
 
 function LandingPage() {
   return (
@@ -23,15 +25,10 @@ function LandingPage() {
         <hr className="border-t border-white w-full" />
       </div>
 
-      <div className="relative z-10 flex flex-col items-center justify-center text-center h-full">
-        <h1 className="text-gray-100 text-5xl mt-40">
-          Revolutionize Your Crop Management
-        </h1>
-        <p className="text-gray-300 text-2xl mt-4">
-          Train custom prediction models and get real-time yield forecasts all
-          in one easy-to-use platform.
-        </p>
-        <GetStartedButton />
+      <div className="relative z-10 flex flex-col items-center text-center h-full pt-30">
+        <img src={RevolutionizeImage} className="h-10"></img>
+        <img src={TrainModelsImage} className="h-10 pt-5"></img>
+        <img src={EasyPlatformImage} className="h-10 pt-5"></img>
       </div>
     </div>
   );
