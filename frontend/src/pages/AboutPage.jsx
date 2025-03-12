@@ -1,69 +1,85 @@
 import LandingTopbar from '../components/LandingTopbar';
-import UgaLogo from '../assets/images/uga.png';
-import PYCSLogo from '../assets/images/pycs-image.jpeg';
 
 function AboutPage() {
+  const publications = [
+    {
+      title:
+        'Comparing Machine Learning Techniques for Alfalfa Biomass Yield Prediction',
+      date: 'Oct 2022',
+      link: 'https://www.researchgate.net/publication/364390863_Comparing_Machine_Learning_Techniques_for_Alfalfa_Biomass_Yield_Prediction',
+    },
+    {
+      title: 'Data Synthesis for Alfalfa Biomass Yield Estimation',
+      date: 'May 2022',
+      link: 'https://www.researchgate.net/publication/366483625_Data_Synthesis_for_Alfalfa_Biomass_Yield_Estimation',
+    },
+    {
+      title:
+        'Using Machine Learning and Feature Selection for Alfalfa Yield Prediction',
+      date: 'Feb 2021',
+      link: 'https://www.researchgate.net/publication/349306527_Using_Machine_Learning_and_Feature_Selection_for_Alfalfa_Yield_Prediction',
+    },
+  ];
+
   return (
-    <div className="relative w-full h-screen bg-black flex flex-col">
-      {/* Topbar */}
-      <div className="absolute top-0 left-0 w-full z-20">
+    <div className="w-full min-h-screen bg-black">
+      <header className="sticky top-0 z-20 bg-black/90 backdrop-blur-sm">
         <LandingTopbar />
-        <hr className="border-t border-white w-full" />
-      </div>
+        <hr className="border-t border-white/20" />
+      </header>
 
-      {/* Content Section */}
-      <div className="relative z-10 flex flex-row justify-center items-center mt-20 px-8 gap-12">
-        {/* Left Column */}
-        <div className="flex-1 text-left">
-          <h1 className="text-gray-100 text-5xl">Predict Your Crops (PYCS)</h1>
-          <p className="text-gray-300 text-2xl mt-10 max-w-3xl">
-            This project was led by Dr. Jonathan Vance from The University of
-            Georgia and is based on his PhD research on the prediction of
-            alfalfa crop yields using machine learning and a synthetic data
-            pipeline. Links to each of his papers can be viewed below:
+      <main className="mx-auto max-w-4xl px-6 lg:px-8 py-12">
+        {/* Title Section */}
+        <h1 className="text-4xl font-bold text-white md:text-5xl mb-12">
+          Predict Your Crops (PYCS)
+        </h1>
+
+        {/* Content Section */}
+        <div className="space-y-8">
+          <p className="text-xl text-gray-300 leading-relaxed">
+            This project enables you to train custom machine learning models
+            from your data, predict yields, and evaluate model performance. It
+            was led by{' '}
+            <a
+              href="https://www.cs.uga.edu/directory/people/jonathan-vance-phd"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-400 hover:text-blue-300 transition-colors"
+            >
+              Dr. Jonathan Vance
+            </a>{' '}
+            from The University of Georgia and is based on his PhD research on
+            the prediction of alfalfa crop yields using machine learning and a
+            synthetic data pipeline.
           </p>
-          <ul className="text-gray-300 text-2xl mt-10 max-w-3xl space-y-4">
-            <li>
-              <a
-                href="https://www.researchgate.net/publication/366483625_Data_Synthesis_for_Alfalfa_Biomass_Yield_Estimation"
-                className="text-blue-400 hover:underline"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Data Synthesis for Alfalfa Biomass Yield Estimation (May 2022)
-              </a>
-            </li>
-            <li>
-              <a
-                href="https://www.researchgate.net/publication/364390863_Comparing_Machine_Learning_Techniques_for_Alfalfa_Biomass_Yield_Prediction"
-                className="text-blue-400 hover:underline"
-              >
-                Comparing Machine Learning Techniques for Alfalfa Biomass Yield
-                Prediction (Oct 2022)
-              </a>
-            </li>
-            <li>
-              <a
-                href="https://www.researchgate.net/publication/349306527_Using_Machine_Learning_and_Feature_Selection_for_Alfalfa_Yield_Prediction"
-                className="text-blue-400 hover:underline"
-              >
-                Using Machine Learning and Feature Selection for Alfalfa Yield
-                Prediction (Feb 2021)
-              </a>
-            </li>
-          </ul>
-        </div>
 
-        {/* Right Column */}
-        <div className="flex-1 flex flex-col items-center">
-          <img src={PYCSLogo} className="w-80 mt-10" alt="PYCS Image" />
-          <img
-            src={UgaLogo}
-            className="w-80 mt-10"
-            alt="University of Georgia Logo"
-          />
+          <section className="space-y-6">
+            <h2 className="text-2xl font-semibold text-white">
+              Research Publications
+            </h2>
+
+            <ul className="space-y-4">
+              {publications.map((paper, index) => (
+                <li key={index} className="group">
+                  <a
+                    href={paper.link}
+                    className="flex flex-col hover:bg-white/5 p-4 rounded-lg transition-all duration-200 border border-transparent hover:border-white/10"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <span className="text-lg text-blue-400 group-hover:text-blue-300 transition-colors">
+                      {paper.title}
+                    </span>
+                    <span className="text-sm text-gray-400 mt-1">
+                      {paper.date}
+                    </span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </section>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
