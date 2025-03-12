@@ -132,3 +132,5 @@ dist
 # additional
 .vscode
 .DS_STORE
+.notes.txt
+.venv/
