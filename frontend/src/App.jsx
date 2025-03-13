@@ -8,6 +8,7 @@ import TrainPage from './pages/TrainPage';
 import PredictPage from './pages/PredictPage';
 import TestPage from './pages/TestPage';
 import SettingsPage from './pages/SettingsPage';
+import HelpPage from './pages/HelpPage';
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
         <Route path="/predict" element={<PredictPage />} />
         <Route path="/test" element={<TestPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/help" element={<HelpPage />} />
       </Routes>
     </Router>
   );

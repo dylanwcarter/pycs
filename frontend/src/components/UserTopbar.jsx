@@ -6,6 +6,7 @@ import TrainButton from './buttons/TrainButton';
 import PredictButton from './buttons/PredictButton';
 import TestButton from './buttons/TestButton';
 import DashboardButton from './buttons/DashboardButton';
+import HelpButton from './buttons/HelpButton';
 import ProfileIcon from '../assets/images/profile-icon.png';
 
 function UserTopbar() {
@@ -25,6 +26,7 @@ function UserTopbar() {
         <TestButton />
         <TrainButton />
         <PredictButton />
+        <HelpButton />
       </div>
       <div className="flex items-center space-x-4 ml-auto">
         <LogoutButton />
