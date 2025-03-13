@@ -1,15 +1,15 @@
 import { useNavigate } from 'react-router-dom';
 
-function TrainButton() {
+function TestButton() {
   const navigate = useNavigate();
   return (
     <button
       className="text-gray-400 bg-black text-md hover:text-gray-300 transition"
-      onClick={() => navigate('/train')}
+      onClick={() => navigate('/test')}
     >
-      Train
+      Test
     </button>
   );
 }
 
-export default TrainButton;
+export default TestButton;

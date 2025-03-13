@@ -5,9 +5,9 @@ function TrainButton() {
   return (
     <button
       className="text-gray-400 bg-black text-md hover:text-gray-300 transition"
-      onClick={() => navigate('/train')}
+      onClick={() => navigate('/predict')}
     >
-      Train
+      Predict
     </button>
   );
 }

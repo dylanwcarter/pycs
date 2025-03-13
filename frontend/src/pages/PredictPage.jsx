@@ -1,12 +1,12 @@
 import UserTopbar from '../components/UserTopbar';
 
-function SettingsPage() {
+function PredictPage() {
   return (
     <div>
       <UserTopbar></UserTopbar>
-      <h1>Settings Page</h1>
+      <h1>Predict Page</h1>
     </div>
   );
 }
 
-export default SettingsPage;
+export default PredictPage;
