@@ -9,6 +9,7 @@ import PredictPage from './pages/PredictPage';
 import TestPage from './pages/TestPage';
 import SettingsPage from './pages/SettingsPage';
 import HelpPage from './pages/HelpPage';
+import LoginPage from './pages/LoginPage';
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
         <Route path="/test" element={<TestPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/help" element={<HelpPage />} />
+        <Route path="/login" element={<LoginPage />} />
       </Routes>
     </Router>
   );

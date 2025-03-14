@@ -3,7 +3,6 @@ import logo from '../assets/images/pycs-logo.png';
 import pycsImage from '../assets/images/pycs-image.jpeg';
 import AboutButton from './buttons/AboutButton';
 import HowItWorksButton from './buttons/HowItWorksButton';
-import SignupButton from './buttons/SignUpButton';
 import ContactButton from './buttons/ContactButton';
 import { useNavigate } from 'react-router-dom';
 
@@ -26,9 +25,8 @@ function LandingTopbar() {
       </div>
 
       <div className="flex items-center space-x-4 ml-auto">
-        <LoginButton />
         <ContactButton />
-        <SignupButton />
+        <LoginButton />
       </div>
     </div>
   );
