@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import UserTopbar from '../components/UserTopbar';
-import { supabase } from './LoginPage';
+import supabase from '../util/supabase';
 
 function SettingsPage() {
   const [user, setUser] = useState(null);

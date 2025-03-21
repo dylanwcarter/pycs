@@ -49,6 +49,9 @@ export const verifyToken = (
   res: Response,
   next: NextFunction,
 ) => {
+  if (res.headersSent) return next();
+  if (req.method === 'OPTIONS') return next();
+
   const token = req.headers.authorization?.split(' ')[1];
 
   if (!token) {

@@ -1,14 +1,9 @@
 import { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import supabase from '../util/supabase';
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { useNavigate } from 'react-router-dom';
 import LandingTopbar from '../components/LandingTopbar';
-
-export const supabase = createClient(
-  'https://vblakthnamztslculhid.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZibGFrdGhuYW16dHNsY3VsaGlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE3MTQzMjAsImV4cCI6MjA1NzI5MDMyMH0.OIAByOpKiUV0vVlfA-z7lA065rjKZIDozJQuH_LewjU',
-);
 
 // Custom theme configuration
 const customTheme = {

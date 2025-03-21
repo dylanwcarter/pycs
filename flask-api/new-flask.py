@@ -28,7 +28,15 @@ from sklearn.linear_model import LinearRegression
 from API import actualTest
 
 app = Flask(__name__)
-CORS(app)
+CORS(
+    app,
+    origins=["http://localhost:3030"],
+    methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Content-Type", "Authorization"],  # Added Authorization
+    expose_headers=["Authorization"],
+    max_age=600,
+    supports_credentials=True,  # Required for session cookies if used
+)
 
 # Feature and target columns
 FEATURE_COLUMNS = ["radiation", "rain", "avg_max_temp", "avg_min_temp"]
@@ -67,6 +75,15 @@ def load_latest_model():
     Here we assume 'xgb' is the base model type.
     """
     return load_latest_model_by_type("xgb")
+
+
+@app.before_request
+def log_request_info():
+    app.logger.debug("\n\n══════════════════════════════════════")
+    app.logger.debug(f"Incoming Request: {request.method} {request.url}")
+    app.logger.debug("Headers: %s", dict(request.headers))
+    app.logger.debug("Files: %s", list(request.files.keys()))
+    app.logger.debug("Form: %s", dict(request.form))
 
 
 @app.route("/test", methods=["GET"])
@@ -428,7 +445,11 @@ def run_pipeline():
     tests the model, and returns key metrics plus the plotting data.
     """
     try:
-        # Check for required files
+        # --- Request Validation ---
+        if not request.content_type.startswith("multipart/form-data"):
+            return jsonify({"error": "Invalid content type. Use form-data"}), 400
+
+        # --- File Validation ---
         required_files = [
             "boost_file",
             "all_years_file",
@@ -436,73 +457,95 @@ def run_pipeline():
             "target_file",
             "target_year_file",
         ]
-        for f in required_files:
-            if f not in request.files:
-                return jsonify({"error": f"Missing required file: {f}"}), 400
+        missing_files = [f for f in required_files if f not in request.files]
+        if missing_files:
+            return jsonify(
+                {"error": "Missing required files", "missing": missing_files}
+            ), 400
 
-        # Helper: read file (Excel or CSV)
+        # --- File Reading with Validation ---
         def read_file(file):
-            if file.filename.endswith(".xlsx"):
-                return pd.read_excel(file)
-            else:
-                return pd.read_csv(file, encoding="latin1")
+            try:
+                if file.filename == "":
+                    raise ValueError("Empty filename")
 
-        # Map incoming files to datasets
-        aggDf = read_file(request.files["boost_file"])  # aggregated data
-        all_yearsDf = read_file(request.files["all_years_file"])
-        final_yearDf = read_file(request.files["final_year_file"])
-        targetDf = read_file(request.files["target_file"])
-        target_yearDf = read_file(request.files["target_year_file"])
+                if file.filename.endswith(".xlsx"):
+                    return pd.read_excel(file)
+                elif file.filename.endswith(".csv"):
+                    return pd.read_csv(file, encoding="latin1")
+                else:
+                    raise ValueError("Unsupported file type")
 
-        # Optionally synthesize additional training data if a 'class' column exists
+            except Exception as e:
+                app.logger.error(f"Error reading {file.filename}: {str(e)}")
+                raise
+
+        # --- Data Processing with Error Zones ---
         try:
-            synth_data = synthesize_tabular_data(aggDf, samples_out=5000)
-            aggDf = pd.concat([aggDf, synth_data], ignore_index=True)
+            aggDf = read_file(request.files["boost_file"])
+            all_yearsDf = read_file(request.files["all_years_file"])
+            final_yearDf = read_file(request.files["final_year_file"])
+            targetDf = read_file(request.files["target_file"])
+            target_yearDf = read_file(request.files["target_year_file"])
         except Exception as e:
-            print("Data synthesis skipped:", e)
+            return jsonify({"error": f"File processing error: {str(e)}"}), 400
 
-        # Define feature and target columns
-        xColumnsToKeep = ["radiation", "rain", "avg_max_temp", "avg_min_temp"]
-        yColumnsToKeep = ["yield"]
+        # --- Data Synthesis ---
+        try:
+            if "class" in aggDf.columns:
+                synth_data = synthesize_tabular_data(aggDf, samples_out=5000)
+                aggDf = pd.concat([aggDf, synth_data], ignore_index=True)
+        except Exception as e:
+            app.logger.warning(f"Data synthesis skipped: {str(e)}")
 
-        # Prepare training data from aggregated data
-        xDf = aggDf[xColumnsToKeep].reset_index(drop=True)
-        yDf = aggDf[yColumnsToKeep].reset_index(drop=True)
-        # Prepare test data from target data
-        test_xDf = targetDf[xColumnsToKeep].reset_index(drop=True)
-        test_yDf = targetDf[yColumnsToKeep].reset_index(drop=True)
+        # --- Model Training ---
+        try:
+            numFeatures = len(FEATURE_COLUMNS)
+            train_result = getBestModel(
+                4, aggDf[FEATURE_COLUMNS], aggDf[[TARGET_COLUMN]], numFeatures
+            )
+            avgMAE, avgRSq, bestMAE, bestRSq, bestModel, scaler = train_result
+        except Exception as e:
+            app.logger.error(f"Model training failed: {str(e)}")
+            return jsonify({"error": f"Model training failed: {str(e)}"}), 500
 
-        # Train model using cross-validation
-        numFeatures = len(xColumnsToKeep)
-        avgMAE, avgRSq, bestMAE, bestRSq, bestModel, scaler = getBestModel(
-            4, xDf, yDf, numFeatures
-        )
+        # --- Prediction ---
+        try:
+            test_x = targetDf[FEATURE_COLUMNS].reset_index(drop=True)
+            test_y = targetDf[[TARGET_COLUMN]].reset_index(drop=True)
 
-        # Run testing and obtain plot data
-        mae, r, plot_data = run_actual_test_for_api(
-            all_yearsDf,
-            final_yearDf,
-            target_yearDf,
-            test_xDf,
-            test_yDf,
-            bestModel,
-            scaler,
-        )
+            mae, r, plot_data = run_actual_test_for_api(
+                all_yearsDf,
+                final_yearDf,
+                target_yearDf,
+                test_x,
+                test_y,
+                bestModel,
+                scaler,
+            )
+        except Exception as e:
+            app.logger.error(f"Prediction failed: {str(e)}")
+            return jsonify({"error": f"Prediction failed: {str(e)}"}), 500
 
-        response_data = {
-            "avg_mae": avgMAE,
-            "avg_r2": avgRSq,
-            "best_mae": bestMAE,
-            "best_r2": bestRSq,
-            "test_mae": mae,
-            "correlation": r,
-            "plot_data": plot_data,
-        }
-        return jsonify(response_data), 200
+        return jsonify(
+            {
+                "avg_mae": avgMAE,
+                "avg_r2": avgRSq,
+                "best_mae": bestMAE,
+                "best_r2": bestRSq,
+                "test_mae": mae,
+                "correlation": r,
+                "plot_data": plot_data,
+            }
+        ), 200
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        app.logger.error(f"Unexpected error: {str(e)}")
+        return jsonify({"error": "Internal server error", "details": str(e)}), 500
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    print("╔══════════════════════════════════════╗")
+    print("║      Flask Server Starting...        ║")
+    print("╚══════════════════════════════════════╝")
+    app.run(host="0.0.0.0", port=5000, debug=True)

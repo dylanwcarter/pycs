@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -10,6 +10,7 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js';
+import supabase from '../util/supabase';
 import UserTopbar from '../components/UserTopbar';
 
 ChartJS.register(
@@ -54,7 +55,36 @@ function TestPage() {
   const [files, setFiles] = useState({});
   const [uploadStatus, setUploadStatus] = useState('idle');
   const [chartData, setChartData] = useState(null);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [session, setSession] = useState(null);
   const [error, setError] = useState(null);
+  const [backendResponse, setBackendResponse] = useState(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const {
+          data: { user },
+          userError,
+        } = await supabase.auth.getUser();
+
+        const { data, sessionError } = await supabase.auth.getSession();
+
+        if (userError) throw userError;
+        if (sessionError) throw sessionError;
+
+        setUser(user);
+        setSession(data.session);
+      } catch (error) {
+        setError(error.message);
+        console.error('Error fetching data:', error);
+      }
+    };
+
+    fetchData();
+    setLoading(false);
+  }, []);
 
   const handleFileSelect = (event) => {
     const selectedFiles = Array.from(event.target.files);
@@ -81,54 +111,94 @@ function TestPage() {
     setUploadStatus('idle');
   };
 
-  const handleUpload = () => {
+  const handleUpload = async () => {
     if (Object.keys(files).length !== requiredFiles.length) {
       setError('Please upload all required files');
       return;
     }
 
     setUploadStatus('loading');
-    setTimeout(() => {
-      if (Math.random() > 0.1) {
-        // 90% success rate for demo
-        setChartData(generateDummyData());
-        setError(null);
-      } else {
-        setError('Simulated failure: Invalid CSV structure');
-        setChartData(null);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      requiredFiles.forEach((fileType) => {
+        formData.append(fileType, files[fileType]);
+      });
+
+      const response = await fetch(
+        import.meta.env.VITE_EXPRESS_URL + '/ml/test',
+        {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          method: 'POST',
+          body: formData,
+        },
+      );
+
+      const responseText = await response.text();
+
+      try {
+        const result = JSON.parse(responseText);
+        if (!response.ok) {
+          throw new Error(result.error || 'Backend request failed');
+        }
+        setBackendResponse(result);
+      } catch (jsonError) {
+        // Handle HTML/XML responses
+        const errorMatch = responseText.match(/<pre>(.*?)<\/pre>/is);
+        const errorMessage = errorMatch
+          ? errorMatch[1]
+          : 'Invalid server response';
+        throw new Error(errorMessage);
       }
+
       setUploadStatus('idle');
-    }, 1500);
+    } catch (error) {
+      console.error('Upload error:', error);
+      setError(error.message);
+      setUploadStatus('idle');
+    }
   };
 
+  // Update renderChart to use backendResponse
   const renderChart = () => {
-    if (!chartData) return null;
+    if (!backendResponse?.plot_data) return null;
 
-    const data = {
-      labels: chartData.plot_data.all_years_index,
-      datasets: [
-        {
-          label: 'All Years Yield',
-          data: chartData.plot_data.all_years_yield,
-          borderColor: 'rgb(75, 192, 192)',
-          tension: 0.1,
-        },
-        {
-          label: 'Target Year Actual',
-          data: chartData.plot_data.target_year_actual_yield,
-          borderColor: 'rgb(255, 99, 132)',
-          tension: 0.1,
-        },
-        {
-          label: 'Adjusted Predictions',
-          data: chartData.plot_data.adjusted_predictions,
-          borderColor: 'rgb(54, 162, 235)',
-          tension: 0.1,
-        },
-      ],
-    };
+    const plotData = backendResponse.plot_data;
 
-    return <Line data={data} />;
+    return (
+      <Line
+        data={{
+          labels: plotData.all_years_index,
+          datasets: [
+            {
+              label: 'All Years Yield',
+              data: plotData.all_years_yield,
+              borderColor: 'rgb(75, 192, 192)',
+              tension: 0.1,
+            },
+            {
+              label: 'Target Year Actual',
+              data: plotData.target_year_actual_yield,
+              borderColor: 'rgb(255, 99, 132)',
+              tension: 0.1,
+            },
+            {
+              label: 'Adjusted Predictions',
+              data: plotData.adjusted_predictions,
+              borderColor: 'rgb(54, 162, 235)',
+              tension: 0.1,
+            },
+          ],
+        }}
+        options={{
+          responsive: true,
+          maintainAspectRatio: false,
+        }}
+      />
+    );
   };
 
   return (
@@ -136,7 +206,6 @@ function TestPage() {
       <UserTopbar />
       <div className="p-6 max-w-7xl mx-auto text-gray-200">
         <h1 className="text-3xl font-bold mb-8">Test Your Data</h1>
-
         {/* File Upload Section */}
         <div className="mb-8 p-4 border border-gray-700 rounded-lg">
           <div className="flex items-center gap-4 mb-4">
@@ -194,32 +263,28 @@ function TestPage() {
             ))}
           </div>
         </div>
-
         {/* Results Section */}
         {error && (
           <div className="p-4 mb-8 bg-red-900 text-red-200 rounded-lg">
             Error: {error}
           </div>
         )}
-
-        {chartData && (
+        {backendResponse && (
           <div className="space-y-8">
             {/* Metrics */}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <div className="p-4 bg-gray-900 rounded-lg">
                 <h3 className="text-sm text-gray-400">Average MAE</h3>
-                <p className="text-xl">{chartData.avg_mae.toFixed(3)}</p>
+                <p className="text-xl">{backendResponse.avg_mae.toFixed(3)}</p>
               </div>
               <div className="p-4 bg-gray-900 rounded-lg">
                 <h3 className="text-sm text-gray-400">Best R²</h3>
-                <p className="text-xl">{chartData.best_r2.toFixed(3)}</p>
+                <p className="text-xl">{backendResponse.best_r2.toFixed(3)}</p>
               </div>
               <div className="p-4 bg-gray-900 rounded-lg">
                 <h3 className="text-sm text-gray-400">Correlation</h3>
                 <p className="text-xl">
-                  {chartData.correlation
-                    ? chartData.correlation.toFixed(3)
-                    : 'N/A'}
+                  {backendResponse.correlation?.toFixed(3) || 'N/A'}
                 </p>
               </div>
             </div>
@@ -227,7 +292,14 @@ function TestPage() {
             {/* Chart */}
             <div className="p-4 bg-gray-900 rounded-lg">
               <h2 className="text-xl font-semibold mb-4">Yield Comparison</h2>
-              <div className="h-96">{renderChart()}</div>
+              <div className="h-96">
+                {renderChart()}
+                {!backendResponse.plot_data && (
+                  <div className="text-gray-400 text-center mt-20">
+                    Chart data loading...
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
