@@ -1,4 +1,5 @@
 import os
+from io import BytesIO
 import math
 import random
 import warnings
@@ -14,7 +15,7 @@ from sklearn.metrics import mean_absolute_error, r2_score, mean_squared_error
 from sklearn.preprocessing import StandardScaler
 from sklearn.feature_selection import SelectKBest, f_regression
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
 from datetime import datetime
 
@@ -115,18 +116,10 @@ def list_models():
 # ---------- /train Endpoint ----------
 @app.route("/train", methods=["POST"])
 def train_model():
-    """
-    Train a model using the provided training file.
-    Specify the model type via query parameter 'model_type'.
-    Supported types: xgb, random_forest, linear_regression.
-    The new model is saved in the subfolder corresponding to the model type.
-    """
-    global model
     training_file = request.files.get("training_file")
     if not training_file:
         return jsonify({"error": "No training file provided."}), 400
 
-    # Get model type from query parameters; default is xgb
     model_type = request.args.get("model_type", "xgb").lower()
 
     try:
@@ -135,7 +128,6 @@ def train_model():
         else:
             training_df = pd.read_csv(training_file, encoding="latin1")
 
-        # Rename columns according to mapping
         COLUMN_MAPPING = {
             "Total Radiation": "radiation",
             "Total Rainfall": "rain",
@@ -147,43 +139,39 @@ def train_model():
         X = training_df[FEATURE_COLUMNS]
         y = training_df[TARGET_COLUMN]
 
-        # Create model based on the provided type
+        # Train model
         if model_type == "xgb":
-            new_model = xgb.XGBRegressor(
+            model = xgb.XGBRegressor(
                 objective="reg:squarederror", n_estimators=100, random_state=42
             )
         elif model_type == "random_forest":
-            new_model = RandomForestRegressor(n_estimators=100, random_state=42)
+            model = RandomForestRegressor(n_estimators=100, random_state=42)
         elif model_type == "linear_regression":
-            new_model = LinearRegression()
+            model = LinearRegression()
         else:
-            return jsonify(
-                {
-                    "error": f"Unsupported model type: {model_type}. Supported types: xgb, random_forest, linear_regression"
-                }
-            ), 400
+            return jsonify({"error": f"Unsupported model type: {model_type}"}), 400
 
-        new_model.fit(X, y)
+        model.fit(X, y)
 
-        # Create the subfolder for the model type if it doesn't exist
-        model_subdir = os.path.join(MODEL_DIR, model_type)
-        os.makedirs(model_subdir, exist_ok=True)
-
-        # Save the model with a filename that includes the model type and timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         model_filename = f"{model_type}_model_{timestamp}.pkl"
-        model_path = os.path.join(model_subdir, model_filename)
-        joblib.dump(new_model, model_path)
-        model = new_model
+        buffer = BytesIO()
+        joblib.dump(model, buffer)
+        buffer.seek(0)
 
-        return jsonify(
-            {
-                "message": "Model trained and saved successfully.",
-                "model_file": model_filename,
-            }
+        response = Response(
+            buffer.getvalue(),
+            mimetype="application/octet-stream",
+            headers={
+                "Content-Disposition": f'attachment; filename="{model_filename}"',
+                "X-Model-Filename": model_filename,
+            },
         )
+
+        return response
+
     except Exception as e:
-        return jsonify({"error": f"Error during training: {str(e)}"}), 500
+        return jsonify({"error": str(e)}), 500
 
 
 # ---------- /upload Endpoint (Unchanged) ----------
@@ -255,46 +243,35 @@ def upload_and_predict():
 @app.route("/predict", methods=["POST"])
 def predict():
     """
-    Make predictions using a selected model.
-    Pass the desired model's filename via query parameter 'model_name'.
-    If 'model_name' is set to "null", the API uses the latest model of type 'model_type' (default is xgb).
+    Make predictions using a model file provided in the request.
+    Expects two files in the request:
+    - model_file: The serialized model file (.pkl)
+    - test_file: The test data file (CSV or Excel)
     """
-    global model
-    # Get the model type from query parameters; default is xgb
-    model_type = request.args.get("model_type", "xgb").lower()
-    model_name = request.args.get("model_name")
-    if model_name and model_name != "null":
-        # Look for the specified model in the respective subfolder
-        model_path = os.path.join(MODEL_DIR, model_type, model_name)
-        if not os.path.exists(model_path):
-            return jsonify(
-                {"error": f"Model '{model_name}' not found in type '{model_type}'."}
-            ), 400
-        try:
-            model = joblib.load(model_path)
-        except Exception as e:
-            return jsonify({"error": f"Error loading model: {str(e)}"}), 500
-    else:
-        # When model_name is "null", load the latest model from the given type
-        loaded_model = load_latest_model_by_type(model_type)
-        if loaded_model is None:
-            return jsonify(
-                {
-                    "error": f"No model of type '{model_type}' available. Please train a model first."
-                }
-            ), 400
-        model = loaded_model
-
-    test_file = request.files.get("test_file")
-    if not test_file:
-        return jsonify({"error": "No test file provided."}), 400
-
     try:
+        # Get files from request
+        model_file = request.files.get("model_file")
+        test_file = request.files.get("test_file")
+
+        if not model_file:
+            return jsonify({"error": "No model file provided"}), 400
+        if not test_file:
+            return jsonify({"error": "No test file provided"}), 400
+
+        # Load model directly from uploaded file
+        model = joblib.load(model_file)
+
+        # Handle tuple-wrapped models (if your training code stores models as tuples)
+        if isinstance(model, tuple):
+            model = model[0]
+
+        # Process test data
         if test_file.filename.endswith(".xlsx"):
             test_df = pd.read_excel(test_file)
         else:
             test_df = pd.read_csv(test_file)
 
+        # Apply consistent column naming
         COLUMN_MAPPING = {
             "Total Radiation": "radiation",
             "Total Rainfall": "rain",
@@ -303,22 +280,28 @@ def predict():
         }
         test_df.rename(columns=COLUMN_MAPPING, inplace=True)
 
+        # Validate required features
         missing_columns = [col for col in FEATURE_COLUMNS if col not in test_df.columns]
         if missing_columns:
             return jsonify(
                 {"error": f"Missing required columns: {missing_columns}"}
             ), 400
 
-        # In case the model was saved as a tuple, use the first element.
-        if isinstance(model, tuple):
-            model = model[0]
-
+        # Generate predictions
         predictions = model.predict(test_df[FEATURE_COLUMNS])
         test_df["Predicted Yield"] = predictions
 
-        return jsonify({"predictions": test_df.to_dict(orient="records")})
+        return jsonify(
+            {
+                "predictions": test_df.to_dict(orient="records"),
+                "features_used": FEATURE_COLUMNS,
+                "prediction_count": len(predictions),
+            }
+        )
+
     except Exception as e:
-        return jsonify({"error": f"Error during prediction: {str(e)}"}), 500
+        app.logger.error(f"Prediction error: {str(e)}")
+        return jsonify({"error": f"Prediction failed: {str(e)}"}), 500
 
 
 # ---------------------- Helper Functions ----------------------------

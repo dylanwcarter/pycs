@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -11,6 +11,7 @@ import {
   Legend,
 } from 'chart.js';
 import UserTopbar from '../components/UserTopbar';
+import supabase from '../util/supabase';
 
 ChartJS.register(
   CategoryScale,
@@ -22,59 +23,167 @@ ChartJS.register(
   Legend,
 );
 
-const dummyPredictions = [
-  {
-    radiation: 15.2,
-    rain: 2.5,
-    avg_max_temp: 28.5,
-    avg_min_temp: 18.0,
-    'Predicted Yield': 2.4,
-  },
-  {
-    radiation: 14.8,
-    rain: 2.7,
-    avg_max_temp: 29.0,
-    avg_min_temp: 18.5,
-    'Predicted Yield': 2.5,
-  },
-  {
-    radiation: 15.5,
-    rain: 2.3,
-    avg_max_temp: 28.0,
-    avg_min_temp: 17.5,
-    'Predicted Yield': 2.3,
-  },
-];
+function convertTimestampToDate(timestampStr) {
+  const timestamp = Number(timestampStr);
+  if (isNaN(timestamp)) return 'Invalid Date';
+  return new Date(timestamp).toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZoneName: 'short',
+  });
+}
 
 function PredictPage() {
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedModel, setSelectedModel] = useState(null);
+  const [selectedTestFile, setSelectedTestFile] = useState(null);
+  const [predictionName, setPredictionName] = useState('');
+  const [userModels, setUserModels] = useState([]);
   const [predictions, setPredictions] = useState(null);
   const [error, setError] = useState(null);
   const [uploadStatus, setUploadStatus] = useState('idle');
+  const [session, setSession] = useState(null);
 
-  const handleFileSelect = (event) => {
-    setSelectedFile(event.target.files[0]);
+  useEffect(() => {
+    const fetchSessionAndModels = async () => {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        setSession(session);
+
+        if (session) {
+          const { data, error } = await supabase
+            .from('Training Data')
+            .select('model_file, model_type')
+            .eq('user_id', session.user.id);
+
+          if (error) throw error;
+
+          setUserModels(
+            data.map((model) => {
+              const parts = model.model_file.split('_');
+              if (parts.length < 4) {
+                console.error('Invalid filename format:', model.model_file);
+                return {
+                  ...model,
+                  displayName: `${model.model_type.toUpperCase()} - Invalid Date`,
+                };
+              }
+
+              const timestampStr = parts[parts.length - 2];
+              const modelType = parts[parts.length - 1].replace('.pkl', '');
+              const modelName = parts.slice(0, parts.length - 3).join(' ');
+
+              return {
+                ...model,
+                displayName: `${modelName} - ${modelType.toUpperCase()} - ${convertTimestampToDate(timestampStr)}`,
+              };
+            }),
+          );
+        }
+      } catch (error) {
+        console.error('Error fetching models:', error);
+        setError('Failed to load models');
+      }
+    };
+
+    fetchSessionAndModels();
+  }, []);
+
+  const handleModelSelect = (event) => {
+    const selectedValue = event.target.value;
+    if (!selectedValue) {
+      setSelectedModel(null);
+      return;
+    }
+    setSelectedModel(JSON.parse(selectedValue));
+  };
+
+  const handleTestFileSelect = (event) => {
+    setSelectedTestFile(event.target.files[0]);
   };
 
   const clearAll = () => {
-    setSelectedFile(null);
+    setSelectedModel(null);
+    setSelectedTestFile(null);
+    setPredictionName('');
     setPredictions(null);
     setError(null);
     setUploadStatus('idle');
   };
 
-  const handlePredict = () => {
-    if (!selectedFile) {
-      setError('Please select a model file');
+  const handlePredict = async () => {
+    if (!selectedModel || !selectedTestFile) {
+      setError('Please select both a model and test file');
+      return;
+    }
+
+    if (!predictionName.trim()) {
+      setError('Please enter a name for this prediction');
       return;
     }
 
     setUploadStatus('loading');
-    setTimeout(() => {
-      setPredictions(dummyPredictions);
-      setError(null);
+    setError(null);
+
+    try {
+      const { data: modelBlob, error: downloadError } = await supabase.storage
+        .from('model-files')
+        .download(selectedModel.model_file);
+
+      if (downloadError) throw downloadError;
+
+      const formData = new FormData();
+      formData.append('model_file', modelBlob, selectedModel.model_file);
+      formData.append('test_file', selectedTestFile);
+
+      const parts = selectedModel.model_file.split('_');
+      const modelType = parts[parts.length - 1].replace('.pkl', '');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_EXPRESS_URL}/ml/predict?model_type=${modelType}`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: formData,
+        },
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Prediction failed');
+      }
+
+      const predictionData = await response.json();
+      setPredictions(predictionData.predictions);
+
+      const { error: storageError } = await supabase
+        .from('Predict Data')
+        .insert([
+          {
+            user_id: session.user.id,
+            name: predictionName.trim(),
+            predictions: predictionData.predictions,
+            created_at: new Date().toISOString(),
+          },
+        ]);
+
+      if (storageError) {
+        console.error('Prediction storage failed:', storageError);
+        throw new Error('Failed to save prediction results');
+      }
+
       setUploadStatus('success');
-    }, 1500);
+    } catch (error) {
+      console.error('Prediction error:', error);
+      setError(error.message);
+      setUploadStatus('error');
+    }
   };
 
   const chartOptions = {
@@ -126,21 +235,78 @@ function PredictPage() {
       <div className="p-6 max-w-7xl mx-auto text-gray-200">
         <h1 className="text-3xl font-bold mb-8">Yield Prediction</h1>
 
-        {/* File Upload Section */}
-        <div className="mb-8 p-4 border border-gray-700 rounded-lg">
-          <div className="flex items-center gap-4 mb-4">
-            <label className="px-4 py-2 bg-gray-800 rounded-lg hover:bg-gray-700 cursor-pointer transition-colors">
-              Select Model File
-              <input
-                type="file"
-                onChange={handleFileSelect}
-                className="hidden"
-                accept=".pkl"
-              />
+        {/* Prediction Name Input */}
+        <div className="mb-4 p-4 border border-gray-700 rounded-lg">
+          <label className="block text-sm font-medium mb-2">
+            Prediction Name
+          </label>
+          <input
+            type="text"
+            value={predictionName}
+            onChange={(e) => setPredictionName(e.target.value)}
+            className="w-full bg-gray-800 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="Enter prediction name (e.g. Summer Corn Forecast)"
+            maxLength={100}
+          />
+        </div>
+
+        {/* Model Selection Section */}
+        <div className="mb-8 p-4 border border-gray-700 rounded-lg space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Select Trained Model
             </label>
+            <select
+              className="w-full bg-gray-800 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              onChange={handleModelSelect}
+              value={selectedModel ? JSON.stringify(selectedModel) : ''}
+            >
+              <option value="">Select a model...</option>
+              {userModels.map((model) => (
+                <option key={model.model_file} value={JSON.stringify(model)}>
+                  {model.displayName}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Test Data (CSV)
+            </label>
+            <div className="flex items-center gap-4">
+              <label className="px-4 py-2 bg-gray-800 rounded-lg hover:bg-gray-700 cursor-pointer transition-colors">
+                Select Test File
+                <input
+                  type="file"
+                  onChange={handleTestFileSelect}
+                  className="hidden"
+                  accept=".csv"
+                />
+              </label>
+              <span className="text-sm text-gray-400">
+                {selectedTestFile?.name || 'No file selected'}
+              </span>
+              {selectedTestFile && (
+                <button
+                  onClick={() => setSelectedTestFile(null)}
+                  className="text-red-500 hover:text-red-400"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
             <button
               onClick={handlePredict}
-              disabled={uploadStatus === 'loading' || !selectedFile}
+              disabled={
+                uploadStatus === 'loading' ||
+                !selectedModel ||
+                !selectedTestFile ||
+                !predictionName.trim()
+              }
               className="px-4 py-2 bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {uploadStatus === 'loading' ? 'Predicting...' : 'Run Prediction'}
@@ -151,20 +317,6 @@ function PredictPage() {
             >
               Clear All
             </button>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-400">
-              {selectedFile?.name || 'No file selected'}
-            </span>
-            {selectedFile && (
-              <button
-                onClick={() => setSelectedFile(null)}
-                className="text-red-500 hover:text-red-400"
-              >
-                ×
-              </button>
-            )}
           </div>
         </div>
 
@@ -207,12 +359,20 @@ function PredictPage() {
                     {predictions.map((prediction, index) => (
                       <tr key={index} className="border-b border-gray-800">
                         <td className="py-3 px-4">#{index + 1}</td>
-                        <td className="py-3 px-4">{prediction.radiation}</td>
-                        <td className="py-3 px-4">{prediction.rain}</td>
-                        <td className="py-3 px-4">{prediction.avg_max_temp}</td>
-                        <td className="py-3 px-4">{prediction.avg_min_temp}</td>
+                        <td className="py-3 px-4">
+                          {prediction.radiation.toFixed(2)}
+                        </td>
+                        <td className="py-3 px-4">
+                          {prediction.rain.toFixed(2)}
+                        </td>
+                        <td className="py-3 px-4">
+                          {prediction.avg_max_temp.toFixed(2)}
+                        </td>
+                        <td className="py-3 px-4">
+                          {prediction.avg_min_temp.toFixed(2)}
+                        </td>
                         <td className="py-3 px-4 font-semibold text-blue-400">
-                          {prediction['Predicted Yield']}
+                          {prediction['Predicted Yield'].toFixed(2)}
                         </td>
                       </tr>
                     ))}
