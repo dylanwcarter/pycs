@@ -7,6 +7,8 @@ import ContactPage from './pages/ContactPage';
 import TrainPage from './pages/TrainPage';
 import PredictPage from './pages/PredictPage';
 import TestPage from './pages/TestPage';
+import TestPlotPage from './pages/TestPlotPage';
+import PredictPlotPage from './pages/PredictPlotPage';
 import SettingsPage from './pages/SettingsPage';
 import HelpPage from './pages/HelpPage';
 import LoginPage from './pages/LoginPage';
@@ -23,6 +25,8 @@ function App() {
         <Route path="/train" element={<TrainPage />} />
         <Route path="/predict" element={<PredictPage />} />
         <Route path="/test" element={<TestPage />} />
+        <Route path="/tests/:id" element={<TestPlotPage />} />
+        <Route path="/predictions/:id" element={<PredictPlotPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/help" element={<HelpPage />} />
         <Route path="/login" element={<LoginPage />} />

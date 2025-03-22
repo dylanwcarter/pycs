@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+
 function TestCard({ id, name, date }) {
   return (
     <div className="bg-gray-900 border border-gray-700 p-4 text-gray-200 rounded-lg w-64 flex-shrink-0">
@@ -9,9 +11,12 @@ function TestCard({ id, name, date }) {
         <h3 className="text-sm text-gray-400">Date</h3>
         <p className="text-sm">{date}</p>
       </div>
-      <button className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors text-sm">
+      <Link
+        to={`/tests/${id}`}
+        className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors text-sm block text-center"
+      >
         View Data
-      </button>
+      </Link>
     </div>
   );
 }
