@@ -2,7 +2,7 @@
 
 ## Overview
 
-This repo contains the code for the website predictyourcrops.com where you can predict alfalfa crop yields and train custom models using the research done by Dr. Jonathan Vance for his PhD. Thanks for looking and feel free to check out the site!
+This repo contains the code for the website pycs.vercel.app where you can predict alfalfa crop yields and train custom models using the research done by Dr. Jonathan Vance for his PhD. Thanks for looking and feel free to check out the site!
 
 ## Tech Stack
 
