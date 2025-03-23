@@ -1,8 +1,8 @@
 import express, { Request, Response, NextFunction } from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
-import { verifyToken } from './middleware/auth';
-import mlRoutes from './routes/mlRoutes';
+import { verifyToken } from './middleware/auth.js';
+import mlRoutes from './routes/mlRoutes.js';
 
 dotenv.config();
 const app = express();
