@@ -6,8 +6,8 @@ This repo contains the code for the website predictyourcrops.com where you can p
 
 ## Tech Stack
 
-- **Backend**: TypeScript, Express, PostgreSQL
-- **Frontend**: TypeScript, React, TailwindCSS, Vite
+- **Backend**: TypeScript, Express, Supabase
+- **Frontend**: React, TailwindCSS, Vite
 
 ## License
 
