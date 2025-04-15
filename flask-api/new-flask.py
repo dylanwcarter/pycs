@@ -23,7 +23,7 @@ warnings.filterwarnings("ignore")
 
 # Import additional models for extended support
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.linear_model import LinearRegression
+from sklearn.tree import DecisionTreeRegressor
 
 # Importing actualTest function from API.py (for the /upload endpoint, which remains unchanged)
 from API import actualTest
@@ -146,8 +146,8 @@ def train_model():
             )
         elif model_type == "random_forest":
             model = RandomForestRegressor(n_estimators=100, random_state=42)
-        elif model_type == "linear_regression":
-            model = LinearRegression()
+        elif model_type == "decision_tree":
+            model = DecisionTreeRegressor(max_depth=10, random_state=42)
         else:
             return jsonify({"error": f"Unsupported model type: {model_type}"}), 400
 
@@ -283,9 +283,10 @@ def predict():
         # Validate required features
         missing_columns = [col for col in FEATURE_COLUMNS if col not in test_df.columns]
         if missing_columns:
-            return jsonify(
-                {"error": f"Missing required columns: {missing_columns}"}
-            ), 400
+            return (
+                jsonify({"error": f"Missing required columns: {missing_columns}"}),
+                400,
+            )
 
         # Generate predictions
         predictions = model.predict(test_df[FEATURE_COLUMNS])
@@ -442,9 +443,10 @@ def run_pipeline():
         ]
         missing_files = [f for f in required_files if f not in request.files]
         if missing_files:
-            return jsonify(
-                {"error": "Missing required files", "missing": missing_files}
-            ), 400
+            return (
+                jsonify({"error": "Missing required files", "missing": missing_files}),
+                400,
+            )
 
         # --- File Reading with Validation ---
         def read_file(file):
@@ -510,17 +512,20 @@ def run_pipeline():
             app.logger.error(f"Prediction failed: {str(e)}")
             return jsonify({"error": f"Prediction failed: {str(e)}"}), 500
 
-        return jsonify(
-            {
-                "avg_mae": avgMAE,
-                "avg_r2": avgRSq,
-                "best_mae": bestMAE,
-                "best_r2": bestRSq,
-                "test_mae": mae,
-                "correlation": r,
-                "plot_data": plot_data,
-            }
-        ), 200
+        return (
+            jsonify(
+                {
+                    "avg_mae": avgMAE,
+                    "avg_r2": avgRSq,
+                    "best_mae": bestMAE,
+                    "best_r2": bestRSq,
+                    "test_mae": mae,
+                    "correlation": r,
+                    "plot_data": plot_data,
+                }
+            ),
+            200,
+        )
 
     except Exception as e:
         app.logger.error(f"Unexpected error: {str(e)}")

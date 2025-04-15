@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import UserTopbar from '../components/UserTopbar';
 import supabase from '../util/supabase';
 
-const MODEL_TYPES = ['xgb', 'random_forest', 'linear_regression'];
+const MODEL_TYPES = ['xgb', 'random_forest', 'decision_tree'];
 
 function TrainPage() {
   const [selectedFile, setSelectedFile] = useState(null);
