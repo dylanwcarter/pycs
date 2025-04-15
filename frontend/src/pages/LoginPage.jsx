@@ -5,21 +5,20 @@ import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { useNavigate } from 'react-router-dom';
 import LandingTopbar from '../components/LandingTopbar';
 
-// Custom theme configuration
 const customTheme = {
   ...ThemeSupa,
   default: {
     ...ThemeSupa.default,
     colors: {
       ...ThemeSupa.default.colors,
-      brand: '#2563eb', // Blue-600
-      brandAccent: '#1d4ed8', // Blue-700
-      inputBackground: '#1f2937', // Gray-800
-      inputText: '#e5e7eb', // Gray-200
-      inputBorder: '#374151', // Gray-700
-      inputLabelText: '#9ca3af', // Gray-400
-      messageText: '#e5e7eb', // Gray-200
-      anchorTextColor: '#93c5fd', // Blue-300
+      brand: '#2563eb',
+      brandAccent: '#1d4ed8',
+      inputBackground: '#1f2937',
+      inputText: '#e5e7eb',
+      inputBorder: '#374151',
+      inputLabelText: '#9ca3af',
+      messageText: '#e5e7eb',
+      anchorTextColor: '#93c5fd',
       buttonText: '#ffffff',
     },
     space: {
@@ -37,49 +36,59 @@ const customTheme = {
   },
 };
 
-export default function App() {
+export default function LoginPage() {
   const [session, setSession] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
+      if (session) {
+        navigate('/dashboard');
+      } else {
+        setSession(null);
+      }
     });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      if (session) {
+        navigate('/dashboard');
+      }
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [navigate]);
 
-  if (!session) {
+  if (session === null) {
     return (
-      <div className="min-h-screen bg-black">
+      <div className="min-h-screen bg-black flex flex-col">
         <LandingTopbar />
-        <div className="mt-20 max-w-xl mx-auto">
-          <div className="bg-gray-900 p-8 rounded-lg border border-gray-700">
-            <Auth
-              supabaseClient={supabase}
-              appearance={{ theme: customTheme }}
-              theme="dark"
-              providers={[]}
-              localization={{
-                variables: {
-                  forgotten_password: {
-                    link_text: '',
+
+        <div className="flex-grow flex items-center justify-center px-4 pb-10">
+          {' '}
+          <div className="w-full max-w-md">
+            <div className="bg-black p-8 rounded-lg border border-gray-700">
+              <Auth
+                supabaseClient={supabase}
+                appearance={{ theme: customTheme }}
+                theme="dark"
+                providers={[]}
+                localization={{
+                  variables: {
+                    forgotten_password: {
+                      link_text: '',
+                    },
                   },
-                },
-              }}
-            />
+                }}
+              />
+            </div>
           </div>
         </div>
       </div>
     );
-  } else {
-    navigate('/dashboard');
-    return null;
   }
+
+  return null;
 }
