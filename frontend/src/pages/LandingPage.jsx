@@ -22,7 +22,7 @@ function LandingPage() {
       {/* Topbar Section */}
       <div className="absolute top-0 left-0 w-full z-20">
         <LandingTopbar />
-        <hr className="border-t border-white w-full" />
+        <hr className="border-t border-white/20" />
       </div>
 
       {/* Text Content - Positioned below topbar */}

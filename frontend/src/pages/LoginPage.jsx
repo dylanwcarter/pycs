@@ -65,6 +65,7 @@ export default function LoginPage() {
     return (
       <div className="min-h-screen bg-black flex flex-col">
         <LandingTopbar />
+        <hr className="border-t border-white/20" />
 
         <div className="flex-grow flex items-center justify-center px-4 pb-10">
           {' '}

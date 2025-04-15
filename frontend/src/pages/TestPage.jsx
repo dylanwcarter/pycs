@@ -210,6 +210,7 @@ function TestPage() {
   return (
     <div className="min-h-screen bg-black">
       <UserTopbar />
+      <hr className="border-t border-white/20" />
       <div className="p-6 max-w-7xl mx-auto text-gray-200">
         <h1 className="text-3xl font-bold mb-8">Test Your Data</h1>
 
